@@ -5,12 +5,13 @@
 
 use std::fs::File;
 use std::io::{BufRead, BufReader};
+use std::iter::empty;
 use std::{io, string};
 use std::{fs, io::IsTerminal};
 use std::path::PathBuf;
 
 use clap::{Parser, ValueEnum};
-use regex::{Regex, regex};
+use regex::{Captures, Regex, regex};
 
 /// When to colorize output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Default)]
@@ -30,7 +31,7 @@ pub struct Cli {
     #[arg(value_name = "PATTERN")]
     pattern: Option<String>,
 
-    /// Files or directories to search. Reads stdin if none are given
+    /// Files or directories to search. Reads stdin if none are given. file
     /// (or searches "." when -r is set).
     #[arg(value_name = "PATH")]
     paths: Vec<PathBuf>,
@@ -136,21 +137,38 @@ impl Cli {
         return reader;
     }
 
-    fn is_match(&self, line: &str, pattern: &str) -> bool {
+    fn is_match(&self, line: &str, pattern: &str) -> (Regex, bool) {
 
-        let mut pttn = format!("{}", pattern);
+        let word_pattern = if self.word_regexp{
+            format!(r"\b{}\b", pattern)
+        }else{
+            format!("{}", pattern)
+        };
 
-        if self.ignore_case && self.word_regexp==false{
-            pttn = format!(r"(?i)\b{}", pattern);
-        }else if self.ignore_case && self.word_regexp{
-            pttn = format!(r"(?i)\b{}\b", pattern);
-        }else if self.word_regexp{
-            pttn = format!(r"\b{}\b", pattern);
-        }else{}
+        let case_insensitive = if self.ignore_case{
+            format!(r"(?i){}", word_pattern)
+        }else{
+            word_pattern
+        };
 
-        let re = Regex::new(&pttn).unwrap();
+        let final_bound = if self.invert_match{
+            format!(r"\(?!{})\w+", case_insensitive)
+        }else{
+            case_insensitive
+        };
 
-        return re.is_match(line);
+
+        // if self.ignore_case && self.word_regexp==false{
+        //     pttn = format!(r"(?i)\b{}", pattern);
+        // }else if self.ignore_case && self.word_regexp{
+        //     pttn = format!(r"(?i)\b{}\b", pattern);
+        // }else if self.word_regexp{
+        //     pttn = format!(r"\b{}\b", pattern);
+        // }else{}
+
+        let re = Regex::new(&final_bound).unwrap();
+
+        return (re.clone(), re.is_match(line).clone());
     }
 }
 
@@ -170,8 +188,14 @@ fn main()-> io::Result<()>{
             if let Ok(line) = line{
                 line_count += 1;
 
-                if cli.is_match(&line, &pattern){
-                    println!("line {}: {}", line_count, line);
+                let (re, is_match) = cli.is_match(&line, &pattern);
+
+                if is_match{
+                    let colored_sentence = re.replace_all(&line, |caps: &Captures| {
+                        format!("\x1b[38;2;255;0;0m{}\x1b[0m", &caps[0])
+                    });
+                    
+                    println!("line \x1b[38;2;0;128;0m{}\x1b[0m: {}", line_count, colored_sentence);
                 }
             }
         }
