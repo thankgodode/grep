@@ -45,18 +45,14 @@ pub struct Cli {
     #[arg(short = 'v', long)]
     pub invert_match: bool,
 
-    /// Treat PATTERN as a literal string, not a regex.
-    #[arg(short = 'F', long)]
-    pub fixed_strings: bool,
-
     /// Match only whole words.
     #[arg(short = 'w', long)]
     pub word_regexp: bool,
 
-    // ---- Output ---------------------------------------------------------
-    /// Prefix each line with its line number.
-    #[arg(short = 'n', long)]
-    pub line_number: bool,
+    // // ---- Output ---------------------------------------------------------
+    // /// Prefix each line with its line number.
+    // #[arg(short = 'n', long)]
+    // pub line_number: bool,
 
     /// Print only a count of matching lines per file.
     #[arg(short = 'c', long)]
@@ -80,6 +76,7 @@ pub struct Cli {
     pub context: Option<usize>,
 
     // ---- Files ----------------------------------------------------------
+    
     /// Search directories recursively (skips hidden files).
     #[arg(short = 'r', long)]
     pub recursive: bool,
@@ -160,8 +157,9 @@ impl Cli {
         //     pttn = format!(r"\b{}\b", pattern);
         // }else{}
 
+        
         let re = Regex::new(&final_bound).unwrap();
-
+        
         return (re.clone(), re.is_match(line).clone());
     }
 }
@@ -175,6 +173,7 @@ fn main()-> io::Result<()>{
 
     for path in paths{
         let mut line_count = 0;
+        let mut count_entry = 0;
 
         let reader: BufReader<File> = cli.clone().read_file(path.clone());
 
@@ -184,16 +183,25 @@ fn main()-> io::Result<()>{
 
                 let (re, is_match) = cli.is_match(&line, &pattern);
 
-                if cli.invert_match && !is_match{
-                    println!("line \x1b[38;2;0;128;0m{}\x1b[0m: {}", line_count, line);
-                }else if is_match && !cli.invert_match{
-                    let colored_sentence = re.replace_all(&line, |caps: &Captures| {
-                        format!("\x1b[38;2;255;0;0m{}\x1b[0m", &caps[0])
-                    });
-                    
-                    println!("line \x1b[38;2;0;128;0m{}\x1b[0m: {}", line_count, colored_sentence);
+                if cli.count && is_match{
+                    count_entry+=1;
+                }else{
+                    if cli.invert_match && !is_match{
+                        println!("line \x1b[38;2;0;128;0m{}\x1b[0m: {}", line_count, line);
+                    }else if is_match && !cli.invert_match{
+                        let colored_sentence = re.replace_all(&line, |caps: &Captures| {
+                            format!("\x1b[38;2;255;0;0m{}\x1b[0m", &caps[0])
+                        });
+                        
+                        println!("line \x1b[38;2;0;128;0m{}\x1b[0m: {}", line_count, colored_sentence);
+                    }
                 }
+
             }
+        }
+
+        if cli.count{
+            println!("Count {}", count_entry);
         }
     }
 
