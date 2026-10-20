@@ -145,16 +145,10 @@ impl Cli {
             format!("{}", pattern)
         };
 
-        let case_insensitive = if self.ignore_case{
+        let final_bound = if self.ignore_case{
             format!(r"(?i){}", word_pattern)
         }else{
             word_pattern
-        };
-
-        let final_bound = if self.invert_match{
-            format!(r"\(?!{})\w+", case_insensitive)
-        }else{
-            case_insensitive
         };
 
 
@@ -190,7 +184,9 @@ fn main()-> io::Result<()>{
 
                 let (re, is_match) = cli.is_match(&line, &pattern);
 
-                if is_match{
+                if cli.invert_match && !is_match{
+                    println!("line \x1b[38;2;0;128;0m{}\x1b[0m: {}", line_count, line);
+                }else if is_match && !cli.invert_match{
                     let colored_sentence = re.replace_all(&line, |caps: &Captures| {
                         format!("\x1b[38;2;255;0;0m{}\x1b[0m", &caps[0])
                     });
@@ -199,7 +195,6 @@ fn main()-> io::Result<()>{
                 }
             }
         }
-
     }
 
     Ok(())
